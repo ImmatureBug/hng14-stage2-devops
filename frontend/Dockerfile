@@ -8,7 +8,7 @@ WORKDIR /app
 RUN useradd -m -u 1001 appuser
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
-COPY . .
+COPY app.js views/ ./
 RUN chown -R appuser:appuser /app
 USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
