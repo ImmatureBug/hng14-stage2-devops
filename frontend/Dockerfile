@@ -1,13 +1,14 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm pkg delete type && npm install --omit=dev
+RUN npm pkg delete type && cat package.json && npm install --omit=dev
 
 FROM node:20-slim
 WORKDIR /app
 RUN useradd -m -u 1001 appuser
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+RUN cat package.json
 COPY app.js views/ ./
 RUN chown -R appuser:appuser /app
 USER appuser
