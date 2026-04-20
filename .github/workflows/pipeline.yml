@@ -1,0 +1,165 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python linter
+        run: pip install flake8
+
+      - name: Install JS linter
+        run: npm install -g eslint
+
+      - name: Install hadolint
+        run: |
+          wget -q -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/
+
+      - name: Lint Python
+        run: flake8 api/ worker/ --max-line-length=100
+
+      - name: Lint JavaScript
+        run: eslint frontend/app.js --env node --parser-options=ecmaVersion:2020
+
+      - name: Lint Dockerfiles
+        run: |
+          hadolint api/Dockerfile
+          hadolint worker/Dockerfile
+          hadolint frontend/Dockerfile
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install fastapi uvicorn redis pytest pytest-cov httpx
+
+      - name: Run tests
+        run: pytest api/tests/ --cov=api --cov-report=xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push images
+        run: |
+          SHA=${{ github.sha }}
+          for svc in api worker frontend; do
+            docker build -t localhost:5000/$svc:$SHA -t localhost:5000/$svc:latest ./$svc
+            docker push localhost:5000/$svc:$SHA
+            docker push localhost:5000/$svc:latest
+          done
+
+  security:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images for scanning
+        run: |
+          for svc in api worker frontend; do
+            docker build -t $svc:latest ./$svc
+          done
+
+      - name: Install Trivy
+        run: |
+          wget -q https://github.com/aquasecurity/trivy/releases/download/v0.50.1/trivy_0.50.1_Linux-64bit.tar.gz
+          tar -xzf trivy_0.50.1_Linux-64bit.tar.gz
+          sudo mv trivy /usr/local/bin/
+
+      - name: Scan images
+        run: |
+          for svc in api worker frontend; do
+            trivy image --exit-code 1 --severity CRITICAL \
+              --format sarif --output trivy-$svc.sarif \
+              $svc:latest
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif
+          path: trivy-*.sarif
+
+  integration-test:
+    needs: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy env file
+        run: cp .env.example .env
+
+      - name: Start stack
+        run: docker compose up -d --build
+
+      - name: Wait for services
+        run: sleep 30
+
+      - name: Run integration test
+        run: |
+          RESPONSE=$(curl -s -X POST http://localhost:3000/submit)
+          echo "Response: $RESPONSE"
+          JOB_ID=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
+          echo "Job ID: $JOB_ID"
+          for i in {1..30}; do
+            STATUS=$(curl -s http://localhost:3000/status/$JOB_ID | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
+            echo "Status: $STATUS"
+            if [ "$STATUS" = "completed" ]; then
+              echo "Job completed successfully"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Job did not complete in time"
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  deploy:
+    needs: integration-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rolling deploy
+        run: |
+          chmod +x ./scripts/rolling-deploy.sh
+          ./scripts/rolling-deploy.sh
