@@ -5,7 +5,7 @@ RUN npm ci --only=production
 
 FROM node:20-slim
 WORKDIR /app
-RUN useradd -m -u 1000 appuser
+RUN useradd -m -u 1001 appuser
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 RUN chown -R appuser:appuser /app
