@@ -120,15 +120,10 @@ jobs:
 
       - name: Wait for services
         run: |
-          echo "Waiting for frontend to be ready..."
-          for i in {1..30}; do
-            if curl -s http://localhost:3000/health | grep -q "ok"; then
-              echo "Frontend is up"
-              break
-            fi
-            echo "Attempt $i - not ready yet..."
-            sleep 5
-          done
+          sleep 40
+          docker compose ps
+          docker compose logs frontend
+          docker compose logs api
 
       - name: Run integration test
         run: |
