@@ -35,7 +35,7 @@ jobs:
         run: flake8 api/ worker/ --max-line-length=100 --extend-ignore=E302,E303,E305,W292
 
       - name: Lint JavaScript
-        run: eslint frontend/app.js
+        run: cd frontend && npx eslint app.js
 
       - name: Lint Dockerfiles
         run: |
