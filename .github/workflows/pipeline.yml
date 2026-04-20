@@ -116,7 +116,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Start stack
-        run: docker compose up -d --build
+        run: docker compose build --no-cache && docker compose up -d
 
       - name: Wait for services
         run: |
