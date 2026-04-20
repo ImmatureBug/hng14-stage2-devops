@@ -35,7 +35,7 @@ jobs:
         run: flake8 api/ worker/ --max-line-length=100 --extend-ignore=E302,E303,E305,W292
 
       - name: Lint JavaScript
-        run: eslint frontend/app.js --env node --parser-options=ecmaVersion:2020
+        run: eslint frontend/app.js
 
       - name: Lint Dockerfiles
         run: |
