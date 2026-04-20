@@ -84,8 +84,8 @@ jobs:
             docker push localhost:5000/$svc:latest
           done
 
-security:
-needs: build
+  security:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
