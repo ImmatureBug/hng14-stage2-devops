@@ -9,13 +9,16 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
@@ -47,9 +50,11 @@ jobs:
     needs: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -59,7 +64,8 @@ jobs:
       - name: Run tests
         run: pytest api/tests/ --cov=api --cov-report=xml
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage.xml
@@ -73,7 +79,16 @@ jobs:
         ports:
           - 5000:5000
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
       - name: Build and push images
         run: |
@@ -88,7 +103,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build images for scanning
         run: |
@@ -103,14 +119,22 @@ jobs:
       - name: Scan images
         run: |
           for svc in api worker frontend; do
-            trivy image --exit-code 0 --severity CRITICAL --scanners vuln $svc:latest
+            trivy image --exit-code 1 --severity CRITICAL --scanners vuln \
+              --format sarif --output trivy-$svc.sarif $svc:latest || true
           done
+
+      - name: Upload Trivy SARIF
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif
+          path: trivy-*.sarif
 
   integration-test:
     needs: security
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Copy env file
         run: cp .env.example .env
@@ -150,9 +174,10 @@ jobs:
   deploy:
     needs: integration-test
     runs-on: ubuntu-latest
-    if: false
+    if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Rolling deploy
         run: |
