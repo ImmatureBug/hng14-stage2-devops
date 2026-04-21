@@ -40,3 +40,12 @@ def test_health_endpoint(mock_redis):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+@patch("main.r")
+def test_create_job_calls_redis(mock_redis):
+    mock_redis.lpush = MagicMock(return_value=1)
+    mock_redis.hset = MagicMock(return_value=1)
+    client.post("/jobs")
+    assert mock_redis.lpush.called
+    assert mock_redis.hset.called

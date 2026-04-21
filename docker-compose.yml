@@ -65,7 +65,8 @@ services:
     environment:
       - API_URL=${API_URL}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     deploy:
       resources:
         limits:
