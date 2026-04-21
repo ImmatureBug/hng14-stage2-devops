@@ -5,7 +5,7 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 
 FROM python:3.11-slim
 WORKDIR /app
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-create-home appuser
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 COPY --from=builder /root/.local /home/appuser/.local
 COPY . .
 RUN chown -R appuser:appgroup /app
