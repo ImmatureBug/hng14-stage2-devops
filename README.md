@@ -1,4 +1,4 @@
-# HNG14 Stage 2 — Job Processing System
+# HNG14 Stage 2: Job Processing System
 
 This is a simple job processing system with three moving parts: a Node.js frontend 
 where you submit jobs, a FastAPI backend that creates and tracks them, and a Python 
